@@ -26,6 +26,7 @@ import com.google.android.gms.maps.GoogleMap.OnMarkerClickListener;
 import com.google.android.gms.maps.GoogleMap.OnMarkerDragListener;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
@@ -33,11 +34,18 @@ import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import android.annotation.SuppressLint;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.SystemClock;
+import android.support.annotation.ColorInt;
+import android.support.annotation.DrawableRes;
+import android.support.v4.content.res.ResourcesCompat;
+import android.support.v4.graphics.drawable.DrawableCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.text.SpannableString;
 import android.text.style.ForegroundColorSpan;
@@ -80,10 +88,12 @@ public class MarkerDemoActivity extends AppCompatActivity implements
 
     private static final LatLng PERTH = new LatLng(-31.952854, 115.857342);
 
+    private static final LatLng ALICE_SPRINGS = new LatLng(-24.6980, 133.8807);
+
     /** Demonstrates customizing the info window and/or its contents. */
     class CustomInfoWindowAdapter implements InfoWindowAdapter {
 
-        // These a both viewgroups containing an ImageView with id "badge" and two TextViews with id
+        // These are both viewgroups containing an ImageView with id "badge" and two TextViews with id
         // "title" and "snippet".
         private final View mWindow;
 
@@ -179,6 +189,8 @@ public class MarkerDemoActivity extends AppCompatActivity implements
 
     private TextView mTopText;
 
+    private TextView mTagText;
+
     private SeekBar mRotationBar;
 
     private CheckBox mFlatBox;
@@ -193,6 +205,7 @@ public class MarkerDemoActivity extends AppCompatActivity implements
         setContentView(R.layout.marker_demo);
 
         mTopText = (TextView) findViewById(R.id.top_text);
+        mTagText = (TextView) findViewById(R.id.tag_text);
 
         mRotationBar = (SeekBar) findViewById(R.id.rotationSeekBar);
         mRotationBar.setMax(360);
@@ -301,6 +314,12 @@ public class MarkerDemoActivity extends AppCompatActivity implements
                 .title("Adelaide")
                 .snippet("Population: 1,213,000"));
 
+        // Vector drawable resource as a marker icon.
+        mMap.addMarker(new MarkerOptions()
+                .position(ALICE_SPRINGS)
+                .icon(vectorToBitmap(R.drawable.ic_android, Color.parseColor("#A4C639")))
+                .title("Alice Springs"));
+
         // Creates a marker rainbow demonstrating how to create default marker icons of different
         // hues (colors).
         float rotation = mRotationBar.getProgress();
@@ -308,15 +327,32 @@ public class MarkerDemoActivity extends AppCompatActivity implements
 
         int numMarkersInRainbow = 12;
         for (int i = 0; i < numMarkersInRainbow; i++) {
-            mMarkerRainbow.add(mMap.addMarker(new MarkerOptions()
+            Marker marker = mMap.addMarker(new MarkerOptions()
                     .position(new LatLng(
                             -30 + 10 * Math.sin(i * Math.PI / (numMarkersInRainbow - 1)),
                             135 - 10 * Math.cos(i * Math.PI / (numMarkersInRainbow - 1))))
                     .title("Marker " + i)
                     .icon(BitmapDescriptorFactory.defaultMarker(i * 360 / numMarkersInRainbow))
                     .flat(flat)
-                    .rotation(rotation)));
+                    .rotation(rotation));
+            marker.setTag(0);
+            mMarkerRainbow.add(marker);
         }
+    }
+
+    /**
+     * Demonstrates converting a {@link Drawable} to a {@link BitmapDescriptor},
+     * for use as a marker icon.
+     */
+    private BitmapDescriptor vectorToBitmap(@DrawableRes int id, @ColorInt int color) {
+        Drawable vectorDrawable = ResourcesCompat.getDrawable(getResources(), id, null);
+        Bitmap bitmap = Bitmap.createBitmap(vectorDrawable.getIntrinsicWidth(),
+                vectorDrawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        vectorDrawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+        DrawableCompat.setTint(vectorDrawable, color);
+        vectorDrawable.draw(canvas);
+        return BitmapDescriptorFactory.fromBitmap(bitmap);
     }
 
     private boolean checkReady() {
@@ -411,6 +447,26 @@ public class MarkerDemoActivity extends AppCompatActivity implements
             marker.setAlpha(mRandom.nextFloat());
         }
 
+        // Markers have a z-index that is settable and gettable.
+        float zIndex = marker.getZIndex() + 1.0f;
+        marker.setZIndex(zIndex);
+        Toast.makeText(this, marker.getTitle() + " z-index set to " + zIndex,
+                Toast.LENGTH_SHORT).show();
+
+        // Markers can store and retrieve a data object via the getTag/setTag methods.
+        // Here we use it to retrieve the number of clicks stored for this marker.
+        Integer clickCount = (Integer) marker.getTag();
+        // Check if a click count was set.
+        if (clickCount != null) {
+            clickCount = clickCount + 1;
+            // Markers can store and retrieve a data object via the getTag/setTag methods.
+            // Here we use it to store the number of clicks for this marker.
+            marker.setTag(clickCount);
+            mTagText.setText(marker.getTitle() + " has been clicked " + clickCount + " times.");
+        } else {
+            mTagText.setText("");
+        }
+
         mLastSelectedMarker = marker;
         // We return false to indicate that we have not consumed the event and that we wish
         // for the default behavior to occur (which is for the camera to move such that the
@@ -425,7 +481,7 @@ public class MarkerDemoActivity extends AppCompatActivity implements
 
     @Override
     public void onInfoWindowClose(Marker marker) {
-        Toast.makeText(this, "Close Info Window", Toast.LENGTH_SHORT).show();
+        //Toast.makeText(this, "Close Info Window", Toast.LENGTH_SHORT).show();
     }
 
     @Override
